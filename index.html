@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Syndicate Ledger</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<style>
+  :root{
+    --bg:#0F1923; --bg2:#16222E; --card:#1B2836; --card2:#20303F;
+    --border:#2A3D4F; --text:#EAF2F8; --sub:#8FA5B8;
+    --gold:#D4A93A; --green:#3FA772; --blue:#4A8FD4; --purple:#9B6FD4;
+    --red:#D4573F; --accent:#3FBF8F;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding-bottom:74px;}
+  header{position:sticky; top:0; z-index:5; background:linear-gradient(180deg,var(--bg) 80%,transparent); padding:16px 16px 8px; }
+  header h1{font-size:17px; margin:0; font-weight:700; letter-spacing:.3px;}
+  header p{margin:2px 0 0; font-size:12px; color:var(--sub);}
+  main{padding:0 14px 130px;}
+  .tab{display:none;}
+  .tab.active{display:block;}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px;}
+  .card .lbl{font-size:11.5px; color:var(--sub); text-transform:uppercase; letter-spacing:.4px;}
+  .card .val{font-size:20px; font-weight:700; margin-top:4px;}
+  .card.tap{cursor:pointer; transition:transform .1s;}
+  .card.tap:active{transform:scale(.97);}
+  .hero{background:linear-gradient(135deg,var(--card2),var(--card)); border:1px solid var(--border); border-radius:16px; padding:18px; margin-top:12px;}
+  .hero .lbl{font-size:12px; color:var(--sub); text-transform:uppercase; letter-spacing:.5px;}
+  .hero .val{font-size:30px; font-weight:800; margin-top:6px; color:var(--accent);}
+  .hero .sub{font-size:12px; color:var(--sub); margin-top:6px;}
+  .hero.tap{cursor:pointer;}
+
+  .section-title{font-size:13px; color:var(--sub); text-transform:uppercase; letter-spacing:.5px; margin:22px 2px 8px;}
+
+  .row{display:flex; justify-content:space-between; align-items:center; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:8px;}
+  .row .rl{font-size:14px; font-weight:600;}
+  .row .rs{font-size:11.5px; color:var(--sub); margin-top:2px;}
+  .row .amt{font-size:15px; font-weight:700;}
+  .pill{display:inline-block; font-size:10.5px; padding:2px 8px; border-radius:20px; margin-left:6px; font-weight:700;}
+  .pill.hand{background:rgba(79,143,212,.18); color:var(--blue);}
+  .pill.bank{background:rgba(63,167,114,.18); color:var(--green);}
+  .pill.given{background:rgba(212,87,63,.18); color:var(--red);}
+  .pill.recv{background:rgba(212,169,58,.18); color:var(--gold);}
+  .pill.settled{background:rgba(143,165,184,.18); color:var(--sub);}
+  .pill.expense{background:rgba(155,111,212,.18); color:var(--purple);}
+
+  .empty{text-align:center; color:var(--sub); font-size:13px; padding:30px 10px;}
+
+  .breakdown{max-height:0; overflow:hidden; transition:max-height .25s ease;}
+  .breakdown.open{max-height:400px;}
+  .breakdown-inner{padding-top:10px;}
+
+  nav{position:fixed; bottom:0; left:0; right:0; background:var(--bg2); border-top:1px solid var(--border); display:flex; z-index:10; padding-bottom:env(safe-area-inset-bottom);}
+  nav button{flex:1; background:none; border:none; color:var(--sub); font-size:11px; padding:10px 0 8px; display:flex; flex-direction:column; align-items:center; gap:3px; font-family:inherit;}
+  nav button .ic{font-size:19px;}
+  nav button.active{color:var(--accent);}
+
+  .fab{position:fixed; right:16px; bottom:82px; width:56px; height:56px; border-radius:50%; background:var(--accent); color:#08130F; font-size:28px; border:none; box-shadow:0 6px 18px rgba(63,191,143,.4); z-index:11; display:flex; align-items:center; justify-content:center;}
+
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:20; display:none;}
+  .overlay.show{display:block;}
+  .sheet{position:fixed; left:0; right:0; bottom:0; background:var(--bg2); border-radius:18px 18px 0 0; padding:18px 16px calc(20px + env(safe-area-inset-bottom)); z-index:21; transform:translateY(100%); transition:transform .25s ease; max-height:88vh; overflow-y:auto;}
+  .sheet.show{transform:translateY(0);}
+  .sheet h2{margin:0 0 14px; font-size:16px;}
+  label{display:block; font-size:12px; color:var(--sub); margin:12px 0 5px;}
+  input,select{width:100%; background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:11px 12px; font-size:15px; font-family:inherit;}
+  input:focus,select:focus{outline:none; border-color:var(--accent);}
+  input[type="date"]{color-scheme:dark;}
+  .split{display:flex; gap:10px;}
+  .split>div{flex:1;}
+  .btnrow{display:flex; gap:10px; margin-top:18px;}
+  .btn{flex:1; padding:13px; border-radius:12px; border:none; font-size:14.5px; font-weight:700; font-family:inherit;}
+  .btn.primary{background:var(--accent); color:#08130F;}
+  .btn.ghost{background:var(--card); color:var(--sub); border:1px solid var(--border);}
+  .btn.danger{background:rgba(212,87,63,.15); color:var(--red); border:1px solid rgba(212,87,63,.35);}
+  .segmented{display:flex; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:3px; margin-top:5px;}
+  .segmented button{flex:1; background:none; border:none; color:var(--sub); font-size:13px; padding:9px 0; border-radius:8px; font-family:inherit; font-weight:600;}
+  .segmented button.on{background:var(--accent); color:#08130F;}
+  .hint{font-size:11.5px; color:var(--sub); margin-top:6px;}
+  .close-x{position:absolute; top:14px; right:16px; background:none; border:none; color:var(--sub); font-size:20px;}
+  .hide-for-viewer{display:none !important;}
+  .group{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:10px;}
+  .group .gh{display:flex; justify-content:space-between; font-weight:700; font-size:14px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💼 Syndicate Ledger</h1>
+  <p id="dateStr"></p>
+  <p id="syncStatus" style="font-size:11px; color:var(--sub); margin-top:4px;">
+    <span id="whoamiLabel">👁️ View Only</span>
+  </p>
+</header>
+
+<!-- ADMIN LOGIN SHEET (opened via header link, not blocking) -->
+<div class="overlay" id="ov-login" onclick="closeAll(event)">
+  <div class="sheet" id="sh-login">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>🔐 Admin Login</h2>
+    <div class="hint">Sirf 3 admins hi edit/add kar sakte hain. Baaki sab (investors) bina login ke sirf dekh sakte hain.</div>
+    <label>Email</label>
+    <input type="email" id="login_email" placeholder="admin@example.com" autocomplete="username">
+    <label>Password</label>
+    <input type="password" id="login_password" placeholder="" autocomplete="current-password">
+    <div class="hint" id="login_error" style="color:var(--red);"></div>
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="doAdminLogin()">Login</button>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <div class="tab active" id="tab-dashboard">
+    <div class="hero" style="position:relative;">
+      <button class="admin-only hide-for-viewer" onclick="openEditInvestment()" style="position:absolute; top:14px; right:14px; background:rgba(255,255,255,.08); border:none; color:var(--text); font-size:14px; padding:6px 9px; border-radius:8px;">✏️</button>
+      <div class="lbl">Total Investment (Fixed)</div>
+      <div class="val" id="totalInvestment">₹0</div>
+      <div class="sub">Set manually — tap ✏️ to update</div>
+    </div>
+
+    <div class="hero tap" style="background:linear-gradient(135deg,#1E2E27,#16221C); margin-top:12px;" onclick="toggleBreakdown('cash')">
+      <div class="lbl">Balance Remaining <span style="opacity:.6;">(tap for Cash detail)</span></div>
+      <div class="val" id="balanceRemaining" style="color:var(--accent);">₹0</div>
+      <div class="sub" id="balanceLine">Investment − Credits − Expenses − Transactions</div>
+      <div class="breakdown" id="cashBreakdown">
+        <div class="breakdown-inner grid2" style="margin-top:0;">
+          <div class="card" style="background:rgba(255,255,255,.04);">
+            <div class="lbl">Cash in Hand</div><div class="val" id="cashHandVal">₹0</div>
+            <div id="partnerHandList" style="margin-top:8px;"></div>
+            <button class="admin-only hide-for-viewer" onclick="event.stopPropagation(); openAddPartner('hand')" style="margin-top:8px; width:100%; background:rgba(255,255,255,.06); border:1px dashed var(--border); color:var(--sub); font-size:11px; padding:6px; border-radius:8px;">+ Partner Holding</button>
+          </div>
+          <div class="card" style="background:rgba(255,255,255,.04);">
+            <div class="lbl">Cash in Bank</div><div class="val" id="cashBankVal">₹0</div>
+            <div id="partnerBankList" style="margin-top:8px;"></div>
+            <button class="admin-only hide-for-viewer" onclick="event.stopPropagation(); openAddPartner('bank')" style="margin-top:8px; width:100%; background:rgba(255,255,255,.06); border:1px dashed var(--border); color:var(--sub); font-size:11px; padding:6px; border-radius:8px;">+ Partner Holding</button>
+          </div>
+        </div>
+        <button class="admin-only hide-for-viewer" onclick="event.stopPropagation(); openTransfer()" style="margin-top:10px; width:100%; background:rgba(255,255,255,.06); border:1px dashed var(--border); color:var(--text); font-size:12px; padding:10px; border-radius:10px;">🔁 Transfer Hand ⇄ Bank</button>
+      </div>
+    </div>
+
+    <div class="hero tap" style="background:linear-gradient(135deg,#2E1E1E,#221616); margin-top:12px;" onclick="toggleBreakdown('debit')">
+      <div class="lbl">Debit Balance <span style="opacity:.6;">(payment liya hua, tap for detail)</span></div>
+      <div class="val" id="debitBalance" style="color:var(--red);">₹0</div>
+      <div class="sub">Kisi se liya hua payment jo abhi settle karna baaki hai</div>
+      <div class="breakdown" id="debitBreakdown">
+        <div class="breakdown-inner" id="debitList"></div>
+      </div>
+    </div>
+
+    <div class="section-title">Kitna Kahan Use Hua</div>
+    <div class="card tap" onclick="showTab('credits')" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+      <div><div class="lbl">Credits Given</div></div>
+      <div class="val" id="u_credits" style="color:var(--red)">₹0</div>
+    </div>
+    <div class="card tap" onclick="toggleBreakdown('expense')" style="margin-bottom:0px; display:flex; justify-content:space-between; align-items:center;">
+      <div><div class="lbl">Expenses</div></div>
+      <div class="val" id="u_expenses" style="color:var(--purple)">₹0</div>
+    </div>
+    <div class="breakdown" id="expenseBreakdown">
+      <div class="breakdown-inner" id="expenseList"></div>
+    </div>
+    <div class="card tap" onclick="showTab('transactions')" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+      <div><div class="lbl">Sopari Transactions</div></div>
+      <div class="val" id="u_txns" style="color:var(--blue)">₹0</div>
+    </div>
+    <div class="card tap" onclick="toggleBreakdown('check')" style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
+      <div><div class="lbl">P&amp;L (Balance Check)</div></div>
+      <div class="val" id="u_pnl" style="color:var(--sub)">₹0</div>
+    </div>
+    <div class="breakdown" id="checkBreakdown">
+      <div class="breakdown-inner" id="checkDetail"></div>
+    </div>
+  </div>
+
+  <!-- INVESTMENT -->
+  <div class="tab" id="tab-investment">
+    <div class="section-title">Investment History</div>
+    <div id="investmentList"></div>
+  </div>
+
+  <!-- TRANSACTIONS -->
+  <div class="tab" id="tab-transactions">
+    <div class="section-title">Sopari Purchases</div>
+    <div id="transactionList"></div>
+  </div>
+
+  <!-- CREDITS -->
+  <div class="tab" id="tab-credits">
+    <div class="grid2">
+      <div class="card"><div class="lbl">Credit Given (Outstanding)</div><div class="val" id="c_given" style="color:var(--red)">₹0</div></div>
+      <div class="card"><div class="lbl">Total Ever Given</div><div class="val" id="c_totalGiven" style="color:var(--gold)">₹0</div></div>
+    </div>
+    <div class="section-title">By Person</div>
+    <div id="creditsByPerson"></div>
+    <div class="section-title">All Credit Entries</div>
+    <div id="creditsList"></div>
+  </div>
+
+  <!-- ACTIVITY -->
+  <div class="tab" id="tab-activity">
+    <div class="section-title">Recent Activity</div>
+    <div id="recentList"></div>
+  </div>
+
+</main>
+
+<nav>
+  <button class="active" data-tab="dashboard" onclick="showTab('dashboard')"><span class="ic">🏠</span>Home</button>
+  <button data-tab="investment" onclick="showTab('investment')"><span class="ic">🏦</span>Invest</button>
+  <button data-tab="transactions" onclick="showTab('transactions')"><span class="ic">📦</span>Sopari</button>
+  <button data-tab="credits" onclick="showTab('credits')"><span class="ic">🤝</span>Credits</button>
+  <button data-tab="activity" onclick="showTab('activity')"><span class="ic">🕒</span>Activity</button>
+</nav>
+
+<button class="fab admin-only hide-for-viewer" onclick="openFab()">+</button>
+
+<!-- FAB choice sheet -->
+<div class="overlay" id="ov-fab" onclick="closeAll(event)">
+  <div class="sheet" id="sh-fab">
+    <h2>Add New</h2>
+    <div class="btnrow" style="flex-direction:column;">
+      <button class="btn primary" onclick="openAddInvestment()">➕ Add Investment (Top-up)</button>
+      <button class="btn primary" onclick="openAddTransaction()">📦 Add Sopari Purchase</button>
+      <button class="btn primary" onclick="openGiveCredit()">🤝 Give Credit (Advance)</button>
+      <button class="btn primary" onclick="openAddExpense()">💸 Add Expense</button>
+      <button class="btn primary" onclick="openAddDebit()">💳 Add Debit (Payment Liya)</button>
+      <button class="btn primary" onclick="openBalanceCheck()">⚖️ Balance Check (Profit/Loss)</button>
+    </div>
+    <button class="btn ghost" style="margin-top:12px" onclick="closeAll()">Cancel</button>
+  </div>
+</div>
+
+<!-- EDIT TOTAL INVESTMENT -->
+<div class="overlay" id="ov-editinv" onclick="closeAll(event)">
+  <div class="sheet" id="sh-editinv">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Edit Total Investment</h2>
+    <div class="hint">Yeh sirf fixed Total Investment number correct karta hai — Cash in Hand/Bank ko touch nahi karta.</div>
+    <label>Total Investment Amount (₹)</label>
+    <input type="number" id="edi_amount" placeholder="0" inputmode="decimal">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveEditInvestment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD INVESTMENT -->
+<div class="overlay" id="ov-invest" onclick="closeAll(event)">
+  <div class="sheet" id="sh-invest">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Add Investment</h2>
+    <label>Date</label>
+    <input type="date" id="inv_date">
+    <label>Add To</label>
+    <div class="segmented" id="inv_src">
+      <button class="on" onclick="setSeg('inv_src',this,'hand')">Cash in Hand</button>
+      <button onclick="setSeg('inv_src',this,'bank')">Cash in Bank</button>
+    </div>
+    <label>Amount (₹)</label>
+    <input type="number" id="inv_amount" placeholder="0" inputmode="decimal">
+    <label>Note (optional)</label>
+    <input type="text" id="inv_note" placeholder="e.g. capital top-up">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveInvestment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- GIVE CREDIT -->
+<div class="overlay" id="ov-credit" onclick="closeAll(event)">
+  <div class="sheet" id="sh-credit">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Give Credit (Advance)</h2>
+    <label>Date</label>
+    <input type="date" id="cr_date">
+    <label>Person / Party Name</label>
+    <input type="text" id="cr_name" placeholder="Name">
+    <label>Amount (₹)</label>
+    <input type="number" id="cr_amount" placeholder="0" inputmode="decimal">
+    <label>Given From</label>
+    <div class="segmented" id="cr_src">
+      <button class="on" onclick="setSeg('cr_src',this,'hand')">Cash in Hand</button>
+      <button onclick="setSeg('cr_src',this,'bank')">Cash in Bank</button>
+    </div>
+    <div class="hint" id="cr_balHint"></div>
+    <label>Note (optional)</label>
+    <input type="text" id="cr_note" placeholder="e.g. advance for stock">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveCredit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TRANSACTION (SOPARI PURCHASE) -->
+<div class="overlay" id="ov-txn" onclick="closeAll(event)">
+  <div class="sheet" id="sh-txn">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Add Sopari Purchase</h2>
+    <label>Date</label>
+    <input type="date" id="tx_date">
+    <label>Party / Farmer Name (optional)</label>
+    <input type="text" id="tx_name" placeholder="Name">
+    <div class="split">
+      <div>
+        <label>Cash (₹)</label>
+        <input type="number" id="tx_cash" placeholder="0" inputmode="decimal" oninput="updateTxnCalc()">
+      </div>
+      <div>
+        <label>Bank (₹)</label>
+        <input type="number" id="tx_bank" placeholder="0" inputmode="decimal" oninput="updateTxnCalc()">
+      </div>
+    </div>
+    <label>Expenses (₹) (optional)</label>
+    <input type="number" id="tx_exp" placeholder="0" inputmode="decimal" oninput="updateTxnCalc()">
+    <div class="hint" id="tx_hint" style="margin-top:10px;"></div>
+    <label>Note (optional)</label>
+    <input type="text" id="tx_note" placeholder="e.g. Gorbalu 20 bags">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveTransaction()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD EXPENSE -->
+<div class="overlay" id="ov-expense" onclick="closeAll(event)">
+  <div class="sheet" id="sh-expense">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Add Expense</h2>
+    <label>Date</label>
+    <input type="date" id="ex_date">
+    <label>Kahan Kharch Hua (Where / Description)</label>
+    <input type="text" id="ex_desc" placeholder="e.g. Fuel, Office rent">
+    <label>Amount (₹)</label>
+    <input type="number" id="ex_amount" placeholder="0" inputmode="decimal">
+    <label>Paid From</label>
+    <div class="segmented" id="ex_src">
+      <button class="on" onclick="setSeg('ex_src',this,'hand')">Cash in Hand</button>
+      <button onclick="setSeg('ex_src',this,'bank')">Cash in Bank</button>
+    </div>
+    <label>Note (optional)</label>
+    <input type="text" id="ex_note" placeholder="">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveExpense()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD PARTNER HOLDING -->
+<div class="overlay" id="ov-partner" onclick="closeAll(event)">
+  <div class="sheet" id="sh-partner">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2 id="partner_title">Partner Holding</h2>
+    <div class="hint" id="partner_hint" style="margin-bottom:6px;"></div>
+    <label>Partner Name</label>
+    <input type="text" id="pt_name" placeholder="e.g. Yusuf bhai">
+    <label>Amount (₹)</label>
+    <input type="number" id="pt_amount" placeholder="0" inputmode="decimal">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="savePartnerHolding()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- BALANCE CHECK (PROFIT/LOSS) -->
+<div class="overlay" id="ov-check" onclick="closeAll(event)">
+  <div class="sheet" id="sh-check">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Balance Check — Actual Cash Count</h2>
+    <div class="hint">Abhi jo tumhare paas physically Cash in Hand aur Cash in Bank hai, wahi daalo. System isko calculated Balance Remaining se compare karke Profit/Loss batayega.</div>
+    <label>Date</label>
+    <input type="date" id="bc_date">
+    <label>Actual Cash in Hand (₹)</label>
+    <input type="number" id="bc_hand" placeholder="0" inputmode="decimal">
+    <label>Actual Cash in Bank (₹)</label>
+    <input type="number" id="bc_bank" placeholder="0" inputmode="decimal">
+    <label>Note (optional)</label>
+    <input type="text" id="bc_note" placeholder="">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveBalanceCheck()">Save & Check</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRANSFER HAND <-> BANK -->
+<div class="overlay" id="ov-transfer" onclick="closeAll(event)">
+  <div class="sheet" id="sh-transfer">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Transfer Cash Hand ⇄ Bank</h2>
+    <div class="hint">Balance Remaining ya Investment pe koi asar nahi — sirf apna paisa Hand se Bank ya Bank se Hand me move hoga.</div>
+    <label>Date</label>
+    <input type="date" id="tr_date">
+    <label>Direction</label>
+    <div class="segmented" id="tr_dir">
+      <button class="on" onclick="setSeg('tr_dir',this,'hand_to_bank')">Hand → Bank</button>
+      <button onclick="setSeg('tr_dir',this,'bank_to_hand')">Bank → Hand</button>
+    </div>
+    <label>Amount (₹)</label>
+    <input type="number" id="tr_amount" placeholder="0" inputmode="decimal">
+    <label>Note (optional)</label>
+    <input type="text" id="tr_note" placeholder="">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveTransfer()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD DEBIT -->
+<div class="overlay" id="ov-debit" onclick="closeAll(event)">
+  <div class="sheet" id="sh-debit">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Add Debit (Payment Liya)</h2>
+    <div class="hint">Kisi se liya hua payment jo seedha sopari/credit/expense me use ho gaya. Ye abhi Balance Remaining se minus nahi hoga — sirf settle karte waqt asar padega.</div>
+    <label>Date</label>
+    <input type="date" id="db_date">
+    <label>Kiske Se Liya (Lender Name)</label>
+    <input type="text" id="db_name" placeholder="Name">
+    <label>Amount (₹)</label>
+    <input type="number" id="db_amount" placeholder="0" inputmode="decimal">
+    <label>Kahan Use Hua</label>
+    <div class="segmented" id="db_usedfor">
+      <button class="on" onclick="setSeg('db_usedfor',this,'sopari')">Sopari</button>
+      <button onclick="setSeg('db_usedfor',this,'credit')">Credit</button>
+      <button onclick="setSeg('db_usedfor',this,'expense')">Expense</button>
+      <button onclick="setSeg('db_usedfor',this,'other')">Other</button>
+    </div>
+    <label>Received Into</label>
+    <div class="segmented" id="db_src">
+      <button class="on" onclick="setSeg('db_src',this,'hand')">Cash in Hand</button>
+      <button onclick="setSeg('db_src',this,'bank')">Cash in Bank</button>
+    </div>
+    <label>Note (optional)</label>
+    <input type="text" id="db_note" placeholder="">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveDebit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTLE DEBIT -->
+<div class="overlay" id="ov-settledebit" onclick="closeAll(event)">
+  <div class="sheet" id="sh-settledebit">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Settle Debit</h2>
+    <div class="hint" id="sdb_info" style="margin-bottom:6px;"></div>
+    <label>Date</label>
+    <input type="date" id="sdb_date">
+    <label>Kaise Settle Kar Rahe Ho</label>
+    <div class="segmented" id="sdb_mode">
+      <button class="on" onclick="setSeg('sdb_mode',this,'direct'); updateSdbMode();">Direct Diya</button>
+      <button onclick="setSeg('sdb_mode',this,'balance'); updateSdbMode();">Hamare Balance Se</button>
+    </div>
+    <div id="sdb_directFields">
+      <label>Amount Settled (₹)</label>
+      <input type="number" id="sdb_amount" placeholder="0" inputmode="decimal">
+    </div>
+    <div id="sdb_balanceFields" style="display:none;">
+      <div class="split">
+        <div>
+          <label>Cash Se (₹)</label>
+          <input type="number" id="sdb_cash" placeholder="0" inputmode="decimal" oninput="updateSdbCalc()">
+        </div>
+        <div>
+          <label>Bank Se (₹)</label>
+          <input type="number" id="sdb_bank" placeholder="0" inputmode="decimal" oninput="updateSdbCalc()">
+        </div>
+      </div>
+      <div class="hint" id="sdb_calc"></div>
+    </div>
+    <label>Note (optional)</label>
+    <input type="text" id="sdb_note" placeholder="">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveSettleDebit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT INVESTMENT ENTRY -->
+<div class="overlay" id="ov-editinvE" onclick="closeAll(event)">
+  <div class="sheet" id="sh-editinvE">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Edit Investment Entry</h2>
+    <div class="hint">Investors exit/entry lete rehte hain — is entry ko correct karo, Cash pools aur Total Investment khud adjust ho jaayenge.</div>
+    <label>Date</label>
+    <input type="date" id="eie_date">
+    <label>Type</label>
+    <div class="segmented" id="eie_type">
+      <button class="on" onclick="setSeg('eie_type',this,'hand')">Cash in Hand</button>
+      <button onclick="setSeg('eie_type',this,'bank')">Cash in Bank</button>
+    </div>
+    <label>Amount (₹)</label>
+    <input type="number" id="eie_amount" placeholder="0" inputmode="decimal">
+    <label>Note (optional)</label>
+    <input type="text" id="eie_note" placeholder="">
+    <div class="btnrow">
+      <button class="btn danger" onclick="deleteInvestmentEntry()">Delete</button>
+      <button class="btn primary" onclick="saveEditInvestmentEntry()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTLE SOPARI TRANSACTION -->
+<div class="overlay" id="ov-settletxn" onclick="closeAll(event)">
+  <div class="sheet" id="sh-settletxn">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Settle Sopari Purchase</h2>
+    <div class="hint" id="stx_info" style="margin-bottom:6px;"></div>
+    <label>Date</label>
+    <input type="date" id="stx_date">
+    <div class="split">
+      <div>
+        <label>Settled in Cash (₹)</label>
+        <input type="number" id="stx_cash" placeholder="0" inputmode="decimal" oninput="updateStxCalc()">
+      </div>
+      <div>
+        <label>Settled in Bank (₹)</label>
+        <input type="number" id="stx_bank" placeholder="0" inputmode="decimal" oninput="updateStxCalc()">
+      </div>
+    </div>
+    <div class="hint" id="stx_calc" style="margin-top:6px;"></div>
+    <label>Note (optional)</label>
+    <input type="text" id="stx_note" placeholder="">
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveSettleTxn()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTLE CREDIT -->
+<div class="overlay" id="ov-settle" onclick="closeAll(event)">
+  <div class="sheet" id="sh-settle">
+    <button class="close-x" onclick="closeAll()">✕</button>
+    <h2>Settle Credit</h2>
+    <div class="hint" id="settle_info" style="margin-bottom:6px;"></div>
+    <label>Date</label>
+    <input type="date" id="settle_date">
+    <label>Amount Received/Paid Now (₹)</label>
+    <input type="number" id="settle_amount" placeholder="0" inputmode="decimal">
+    <label id="settle_srcLabel">Received Into</label>
+    <div class="segmented" id="settle_src">
+      <button class="on" onclick="setSeg('settle_src',this,'hand')">Cash in Hand</button>
+      <button onclick="setSeg('settle_src',this,'bank')">Cash in Bank</button>
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" onclick="closeAll()">Cancel</button>
+      <button class="btn primary" onclick="saveSettle()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ====== FIREBASE CONFIG — naya Syndicate Ledger Firebase project ka config yahan paste karo ======
+const firebaseConfig = {
+  apiKey: "AIzaSyD01PyznteX4FIFUlmFiwu-TrlV7gqIDOc",
+  authDomain: "syndicate-ledger.firebaseapp.com",
+  projectId: "syndicate-ledger",
+  storageBucket: "syndicate-ledger.firebasestorage.app",
+  messagingSenderId: "620546547017",
+  appId: "1:620546547017:web:21c7204b1027ffff8d4e98",
+  measurementId: "G-BZLJ6VVGBF"
+};
+let db = null, docRef = null, firebaseReady = false;
+try{
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+  docRef = db.collection('syndicate').doc('main');
+  firebaseReady = true;
+}catch(e){ console.error('Firebase init failed', e); }
+
+let isAdmin = false;
+let currentUserEmail = '';
+
+function firebaseSignInThenSync(){
+  if(!firebaseReady) return;
+  firebase.auth().onAuthStateChanged(user=>{
+    if(user && !user.isAnonymous){
+      isAdmin = true;
+      currentUserEmail = user.email || 'Admin';
+    } else {
+      isAdmin = false;
+      currentUserEmail = '';
+    }
+    updateAdminUI();
+  });
+  // Everyone (admins and investors) reads via anonymous auth — Firestore rules allow public read regardless,
+  // this just keeps a consistent auth context for the SDK.
+  firebase.auth().signInAnonymously().catch(err=>{
+    console.error('Anonymous sign-in failed', err);
+  });
+  setupFirebaseSync();
+}
+
+function updateAdminUI(){
+  document.getElementById('whoamiLabel').innerHTML = isAdmin
+    ? `🔓 Admin: ${currentUserEmail} · <span onclick="doAdminLogout()" style="color:var(--red); text-decoration:underline; cursor:pointer;">Logout</span>`
+    : `👁️ View Only · <span onclick="openSheet('ov-login','sh-login')" style="color:var(--accent); text-decoration:underline; cursor:pointer;">Admin Login</span>`;
+  document.querySelectorAll('.admin-only').forEach(el=>{
+    el.classList.toggle('hide-for-viewer', !isAdmin);
+  });
+  render();
+}
+
+function doAdminLogin(){
+  const email = document.getElementById('login_email').value.trim();
+  const pass = document.getElementById('login_password').value;
+  document.getElementById('login_error').textContent = '';
+  firebase.auth().signInWithEmailAndPassword(email, pass).then(()=>{
+    closeAll();
+  }).catch(err=>{
+    document.getElementById('login_error').textContent = 'Login fail hua — email/password check karo.';
+    console.error('Admin login failed', err);
+  });
+}
+function doAdminLogout(){
+  firebase.auth().signOut().then(()=>{
+    firebase.auth().signInAnonymously();
+  });
+}
+window.doAdminLogin = doAdminLogin;
+window.doAdminLogout = doAdminLogout;
+
+const STORE_KEY = 'syndicate_ledger_v1';
+let state = loadLocal();
+let settleTarget = null;
+let suppressNextSnapshot = false;
+
+function applyDefaults(s){
+  if(typeof s.totalInvestment !== 'number') s.totalInvestment = (s.cashHand||0)+(s.cashBank||0);
+  if(!s.cashHand) s.cashHand = s.cashHand||0;
+  if(!s.cashBank) s.cashBank = s.cashBank||0;
+  if(!s.expenses) s.expenses = [];
+  if(!s.activity) s.activity = [];
+  if(!s.credits) s.credits = [];
+  if(!s.transactions) s.transactions = [];
+  if(!s.investments) s.investments = [];
+  if(!s.partnerCash) s.partnerCash = {hand:[], bank:[]};
+  if(!s.debits) s.debits = [];
+  if(!s.balanceChecks) s.balanceChecks = [];
+  return s;
+}
+
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      return applyDefaults(JSON.parse(raw));
+    }
+  }catch(e){}
+  return applyDefaults({ cashHand:0, cashBank:0 });
+}
+function save(){
+  if(!isAdmin){ console.warn('Blocked: view-only mode, not an admin.'); return; }
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  if(firebaseReady && docRef){
+    suppressNextSnapshot = true;
+    try{
+      const cleanState = JSON.parse(JSON.stringify(state)); // strips any accidental `undefined` fields — Firestore rejects those and fails silently otherwise
+      docRef.set(cleanState).then(()=>{
+        document.getElementById('syncStatus').style.opacity='1';
+      }).catch(err=>{
+        console.error('Firestore sync failed', err);
+        suppressNextSnapshot = false;
+      });
+    }catch(err){
+      console.error('Firestore sync failed (sync throw)', err);
+      suppressNextSnapshot = false;
+    }
+  }
+  render();
+}
+
+function setupFirebaseSync(){
+  if(!firebaseReady || !docRef) return;
+  docRef.onSnapshot(doc=>{
+    if(suppressNextSnapshot){ suppressNextSnapshot=false; return; }
+    if(doc.exists){
+      state = applyDefaults(doc.data());
+      render();
+    } else {
+      docRef.set(state);
+    }
+  }, err=>{
+    console.error('Firestore listen failed', err);
+  });
+}
+
+function fmt(n){
+  n = Math.round((n||0)*100)/100;
+  return '₹' + n.toLocaleString('en-IN');
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayISO(){
+  const d = new Date();
+  const tz = d.getTimezoneOffset()*60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+function displayDate(iso){
+  if(!iso) return '';
+  const [y,m,d] = iso.split('-');
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d} ${months[parseInt(m,10)-1]} ${y}`;
+}
+document.getElementById('dateStr').textContent = displayDate(todayISO());
+
+function logActivity(icon, title, subtitle, amount, date, colorVar, balanceBefore){
+  const balanceAfter = computeBalanceRemaining();
+  const entry = {id:uid(), date: date||todayISO(), icon, title, subtitle, amount, color: colorVar||'--text', by: currentUserEmail||'Admin', balanceAfter};
+  if(typeof balanceBefore === 'number') entry.balanceBefore = balanceBefore;
+  state.activity.unshift(entry);
+}
+
+// ---------- NAV ----------
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+}
+
+// ---------- MODALS ----------
+function openSheet(ovId, shId){
+  document.getElementById(ovId).classList.add('show');
+  requestAnimationFrame(()=>document.getElementById(shId).classList.add('show'));
+}
+function closeAll(e){
+  if(e && e.target !== e.currentTarget) return;
+  document.querySelectorAll('.overlay.show').forEach(o=>{
+    const sheetEl = o.querySelector('.sheet');
+    sheetEl.classList.remove('show');
+    setTimeout(()=>{ if(!sheetEl.classList.contains('show')) o.classList.remove('show'); }, 200);
+  });
+}
+function openFab(){ openSheet('ov-fab','sh-fab'); }
+
+function openAddInvestment(){
+  closeAll();
+  setTimeout(()=>{
+    document.getElementById('inv_date').value = todayISO();
+    document.getElementById('inv_amount').value='';
+    document.getElementById('inv_note').value='';
+    openSheet('ov-invest','sh-invest');
+  },150);
+}
+function openEditInvestment(){
+  document.getElementById('edi_amount').value = state.totalInvestment || '';
+  openSheet('ov-editinv','sh-editinv');
+}
+function saveEditInvestment(){
+  const amt = parseFloat(document.getElementById('edi_amount').value);
+  if(isNaN(amt) || amt<0){ alert('Enter valid amount'); return; }
+  const balanceBefore = computeBalanceRemaining();
+  state.totalInvestment = amt;
+  logActivity('✏️','Investment corrected', `Total Investment set to ${fmt(amt)}`, amt, todayISO(), '--gold', balanceBefore);
+  closeAll(); save();
+}
+
+function openGiveCredit(){
+  closeAll();
+  setTimeout(()=>{
+    document.getElementById('cr_date').value = todayISO();
+    document.getElementById('cr_name').value='';
+    document.getElementById('cr_amount').value='';
+    document.getElementById('cr_note').value='';
+    openSheet('ov-credit','sh-credit');
+    updateCreditHint();
+  },150);
+}
+function openAddTransaction(){
+  closeAll();
+  setTimeout(()=>{
+    document.getElementById('tx_date').value = todayISO();
+    document.getElementById('tx_name').value='';
+    document.getElementById('tx_cash').value='';
+    document.getElementById('tx_bank').value='';
+    document.getElementById('tx_exp').value='';
+    document.getElementById('tx_note').value='';
+    updateTxnCalc();
+    openSheet('ov-txn','sh-txn');
+  },150);
+}
+function openAddExpense(){
+  closeAll();
+  setTimeout(()=>{
+    document.getElementById('ex_date').value = todayISO();
+    document.getElementById('ex_desc').value='';
+    document.getElementById('ex_amount').value='';
+    document.getElementById('ex_note').value='';
+    openSheet('ov-expense','sh-expense');
+  },150);
+}
+function openAddDebit(){
+  closeAll();
+  setTimeout(()=>{
+    document.getElementById('db_date').value = todayISO();
+    document.getElementById('db_name').value='';
+    document.getElementById('db_amount').value='';
+    document.getElementById('db_note').value='';
+    openSheet('ov-debit','sh-debit');
+  },150);
+}
+function openTransfer(){
+  document.getElementById('tr_date').value = todayISO();
+  document.getElementById('tr_amount').value='';
+  document.getElementById('tr_note').value='';
+  openSheet('ov-transfer','sh-transfer');
+}
+function openBalanceCheck(){
+  closeAll();
+  setTimeout(()=>{
+    document.getElementById('bc_date').value = todayISO();
+    document.getElementById('bc_hand').value='';
+    document.getElementById('bc_bank').value='';
+    document.getElementById('bc_note').value='';
+    openSheet('ov-check','sh-check');
+  },150);
+}
+function saveBalanceCheck(){
+  const hand = parseFloat(document.getElementById('bc_hand').value)||0;
+  const bank = parseFloat(document.getElementById('bc_bank').value)||0;
+  const date = document.getElementById('bc_date').value || todayISO();
+  const note = document.getElementById('bc_note').value.trim();
+  const actualTotal = hand + bank;
+  const expected = computeBalanceRemaining();
+  const diff = actualTotal - expected;
+  state.balanceChecks.unshift({id:uid(), date, actualHand:hand, actualBank:bank, actualTotal, expected, diff, note});
+  // Reset live Cash in Hand / Cash in Bank to match the actual physical count just entered.
+  state.cashHand = hand;
+  state.cashBank = bank;
+  const status = Math.abs(diff)<=0.5 ? 'Match' : (diff<0 ? `Loss ${fmt(Math.abs(diff))}` : `Profit ${fmt(diff)}`);
+  logActivity('⚖️','Balance Check', `Actual ${fmt(actualTotal)} vs Expected ${fmt(expected)} — ${status} (Cash reset to actual)`, Math.abs(diff), date, diff<0?'--red':(diff>0?'--green':'--sub'), expected);
+  closeAll(); save();
+}
+function saveTransfer(){
+  const dir = document.getElementById('tr_dir').dataset.val;
+  const amt = parseFloat(document.getElementById('tr_amount').value)||0;
+  const date = document.getElementById('tr_date').value || todayISO();
+  const note = document.getElementById('tr_note').value.trim();
+  if(!amt || amt<=0){ alert('Enter valid amount'); return; }
+  if(dir==='hand_to_bank'){
+    if(amt > state.cashHand){ if(!confirm(`Cash in Hand only has ${fmt(state.cashHand)}. Continue anyway?`)) return; }
+    state.cashHand -= amt;
+    state.cashBank += amt;
+  } else {
+    if(amt > state.cashBank){ if(!confirm(`Cash in Bank only has ${fmt(state.cashBank)}. Continue anyway?`)) return; }
+    state.cashBank -= amt;
+    state.cashHand += amt;
+  }
+  logActivity('🔁','Cash Transfer', `${dir==='hand_to_bank'?'Hand → Bank':'Bank → Hand'}${note?' • '+note:''}`, amt, date, '--blue', computeBalanceRemaining());
+  closeAll(); save();
+}
+
+function setSeg(groupId, btn, val){
+  document.getElementById(groupId).querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById(groupId).dataset.val = val;
+  if(groupId==='cr_src') updateCreditHint();
+}
+document.getElementById('inv_src').dataset.val='hand';
+document.getElementById('cr_src').dataset.val='hand';
+document.getElementById('settle_src').dataset.val='hand';
+document.getElementById('db_usedfor').dataset.val='sopari';
+document.getElementById('db_src').dataset.val='hand';
+document.getElementById('ex_src').dataset.val='hand';
+document.getElementById('sdb_mode').dataset.val='direct';
+document.getElementById('tr_dir').dataset.val='hand_to_bank';
+
+function updateCreditHint(){
+  const src = document.getElementById('cr_src').dataset.val;
+  const bal = src==='hand' ? state.cashHand : state.cashBank;
+  document.getElementById('cr_balHint').textContent = `Available in ${src==='hand'?'Cash Hand':'Cash Bank'}: ${fmt(bal)}`;
+}
+
+function updateTxnCalc(){
+  const cash = parseFloat(document.getElementById('tx_cash').value)||0;
+  const bank = parseFloat(document.getElementById('tx_bank').value)||0;
+  const exp = parseFloat(document.getElementById('tx_exp').value)||0;
+  const total = cash + bank;
+  const overall = total + exp;
+  document.getElementById('tx_hint').innerHTML =
+    `Total (Cash+Bank): <b>${fmt(total)}</b> &nbsp;|&nbsp; Overall (incl. expenses, minus from Balance): <b style="color:var(--gold)">${fmt(overall)}</b>`;
+}
+
+// ---------- SAVE HANDLERS ----------
+function saveInvestment(){
+  const amt = parseFloat(document.getElementById('inv_amount').value);
+  if(!amt || amt<=0){ alert('Enter valid amount'); return; }
+  const src = document.getElementById('inv_src').dataset.val;
+  const note = document.getElementById('inv_note').value.trim();
+  const date = document.getElementById('inv_date').value || todayISO();
+  const balanceBefore = computeBalanceRemaining();
+  if(src==='hand') state.cashHand += amt; else state.cashBank += amt;
+  state.totalInvestment = (state.totalInvestment||0) + amt;
+  state.investments.unshift({id:uid(), date, type:src, amount:amt, note});
+  logActivity('➕','Investment Added', `${note||'Top-up'} (${src==='hand'?'Cash Hand':'Cash Bank'})`, amt, date, '--accent', balanceBefore);
+  closeAll(); save();
+}
+
+let editInvestmentTarget = null;
+function openEditInvestmentEntry(id){
+  editInvestmentTarget = state.investments.find(x=>x.id===id);
+  if(!editInvestmentTarget) return;
+  document.getElementById('eie_date').value = editInvestmentTarget.date;
+  document.getElementById('eie_amount').value = editInvestmentTarget.amount;
+  document.getElementById('eie_note').value = editInvestmentTarget.note||'';
+  document.getElementById('eie_type').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on', (editInvestmentTarget.type==='hand'?0:1)===i));
+  document.getElementById('eie_type').dataset.val = editInvestmentTarget.type;
+  openSheet('ov-editinvE','sh-editinvE');
+}
+function saveEditInvestmentEntry(){
+  if(!editInvestmentTarget) return;
+  const newAmt = parseFloat(document.getElementById('eie_amount').value)||0;
+  const newType = document.getElementById('eie_type').dataset.val;
+  const newNote = document.getElementById('eie_note').value.trim();
+  const newDate = document.getElementById('eie_date').value || todayISO();
+  const balanceBefore = computeBalanceRemaining();
+  // reverse old effect
+  if(editInvestmentTarget.type==='hand') state.cashHand -= editInvestmentTarget.amount; else state.cashBank -= editInvestmentTarget.amount;
+  state.totalInvestment = (state.totalInvestment||0) - editInvestmentTarget.amount;
+  // apply new effect
+  if(newType==='hand') state.cashHand += newAmt; else state.cashBank += newAmt;
+  state.totalInvestment = (state.totalInvestment||0) + newAmt;
+  editInvestmentTarget.amount = newAmt;
+  editInvestmentTarget.type = newType;
+  editInvestmentTarget.note = newNote;
+  editInvestmentTarget.date = newDate;
+  logActivity('✏️','Investment Entry Edited', `${newNote||'Top-up'} corrected to ${fmt(newAmt)} (${newType==='hand'?'Cash Hand':'Cash Bank'})`, newAmt, newDate, '--gold', balanceBefore);
+  closeAll(); save();
+}
+function deleteInvestmentEntry(){
+  if(!editInvestmentTarget) return;
+  if(!confirm('Ye investment entry delete karni hai? Cash pools aur Total Investment se bhi minus ho jaayega.')) return;
+  const balanceBefore = computeBalanceRemaining();
+  if(editInvestmentTarget.type==='hand') state.cashHand -= editInvestmentTarget.amount; else state.cashBank -= editInvestmentTarget.amount;
+  state.totalInvestment = (state.totalInvestment||0) - editInvestmentTarget.amount;
+  state.investments = state.investments.filter(x=>x.id!==editInvestmentTarget.id);
+  logActivity('🗑️','Investment Entry Deleted', `${editInvestmentTarget.note||'Top-up'} — ${fmt(editInvestmentTarget.amount)} removed`, editInvestmentTarget.amount, todayISO(), '--red', balanceBefore);
+  editInvestmentTarget = null;
+  closeAll(); save();
+}
+window.openEditInvestmentEntry = openEditInvestmentEntry;
+window.saveEditInvestmentEntry = saveEditInvestmentEntry;
+window.deleteInvestmentEntry = deleteInvestmentEntry;
+
+function saveCredit(){
+  const name = document.getElementById('cr_name').value.trim();
+  const amt = parseFloat(document.getElementById('cr_amount').value);
+  const src = document.getElementById('cr_src').dataset.val;
+  const note = document.getElementById('cr_note').value.trim();
+  const date = document.getElementById('cr_date').value || todayISO();
+  if(!amt || amt<=0){ alert('Enter valid amount'); return; }
+  const bal = src==='hand' ? state.cashHand : state.cashBank;
+  if(amt > bal){ if(!confirm(`${src==='hand'?'Cash in Hand':'Cash in Bank'} only has ${fmt(bal)}. Continue anyway?`)) return; }
+  const balanceBefore = computeBalanceRemaining();
+  if(src==='hand') state.cashHand -= amt; else state.cashBank -= amt;
+  state.credits.unshift({id:uid(), date, name:name||'Unnamed', amount:amt, outstanding:amt, type:'given', source:src, note, settled:false});
+  logActivity('🤝','Credit Given', `${name||'Unnamed'} (from ${src==='hand'?'Cash Hand':'Cash Bank'})`, amt, date, '--red', balanceBefore);
+  closeAll(); save();
+}
+
+function saveTransaction(){
+  const name = document.getElementById('tx_name').value.trim();
+  const cash = parseFloat(document.getElementById('tx_cash').value)||0;
+  const bank = parseFloat(document.getElementById('tx_bank').value)||0;
+  const exp = parseFloat(document.getElementById('tx_exp').value)||0;
+  const total = cash + bank;
+  const overall = total + exp;
+  const note = document.getElementById('tx_note').value.trim();
+  const date = document.getElementById('tx_date').value || todayISO();
+  const balanceBefore = computeBalanceRemaining();
+  state.cashHand -= cash;
+  state.cashBank -= bank;
+
+  const txn = {id:uid(), date, name, cash, bank, total, expenses:exp, overall, note, settled:false, settlements:[]};
+  state.transactions.unshift(txn);
+  logActivity('📦','Sopari Purchase Added', `${name||'Sopari Purchase'} — ${fmt(overall)}`, overall, date, '--blue', balanceBefore);
+  closeAll(); save();
+}
+
+function saveExpense(){
+  const desc = document.getElementById('ex_desc').value.trim();
+  const amt = parseFloat(document.getElementById('ex_amount').value)||0;
+  const src = document.getElementById('ex_src').dataset.val;
+  const note = document.getElementById('ex_note').value.trim();
+  const date = document.getElementById('ex_date').value || todayISO();
+  const balanceBefore = computeBalanceRemaining();
+  if(src==='hand') state.cashHand -= amt; else state.cashBank -= amt;
+  state.expenses.unshift({id:uid(), date, description:desc||'Expense', amount:amt, source:src, note, settled:false});
+  logActivity('💸','Expense Added', `${desc||'Expense'} (from ${src==='hand'?'Cash Hand':'Cash Bank'})`, amt, date, '--purple', balanceBefore);
+  closeAll(); save();
+}
+
+function saveDebit(){
+  const name = document.getElementById('db_name').value.trim();
+  const amt = parseFloat(document.getElementById('db_amount').value)||0;
+  const usedFor = document.getElementById('db_usedfor').dataset.val;
+  const src = document.getElementById('db_src').dataset.val;
+  const note = document.getElementById('db_note').value.trim();
+  const date = document.getElementById('db_date').value || todayISO();
+  // Debit does NOT affect Balance Remaining — borrowed money, not our investment. No balanceBefore/After shown.
+  if(src==='hand') state.cashHand += amt; else state.cashBank += amt;
+  state.debits.unshift({id:uid(), date, lenderName:name||'Unnamed', amount:amt, outstanding:amt, usedFor, source:src, note, settled:false, repayments:[]});
+  logActivity('💳','Debit Taken', `${name||'Unnamed'} — used for ${usedFor} (into ${src==='hand'?'Cash Hand':'Cash Bank'})`, amt, date, '--red');
+  closeAll(); save();
+}
+
+let settleDebitTarget = null;
+function updateSdbMode(){
+  const mode = document.getElementById('sdb_mode').dataset.val;
+  document.getElementById('sdb_directFields').style.display = mode==='direct' ? '' : 'none';
+  document.getElementById('sdb_balanceFields').style.display = mode==='balance' ? '' : 'none';
+}
+function updateSdbCalc(){
+  const cash = parseFloat(document.getElementById('sdb_cash').value)||0;
+  const bank = parseFloat(document.getElementById('sdb_bank').value)||0;
+  document.getElementById('sdb_calc').textContent = `Total Settling Now: ${fmt(cash+bank)}`;
+}
+function openSettleDebit(id){
+  settleDebitTarget = state.debits.find(d=>d.id===id);
+  if(!settleDebitTarget) return;
+  document.getElementById('sdb_info').textContent =
+    `${settleDebitTarget.lenderName} — Outstanding: ${fmt(settleDebitTarget.outstanding)}`;
+  document.getElementById('sdb_date').value = todayISO();
+  document.getElementById('sdb_amount').value='';
+  document.getElementById('sdb_cash').value='';
+  document.getElementById('sdb_bank').value='';
+  document.getElementById('sdb_note').value='';
+  document.getElementById('sdb_mode').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on', i===0));
+  document.getElementById('sdb_mode').dataset.val='direct';
+  updateSdbMode();
+  openSheet('ov-settledebit','sh-settledebit');
+}
+function saveSettleDebit(){
+  if(!settleDebitTarget) return;
+  const mode = document.getElementById('sdb_mode').dataset.val;
+  const date = document.getElementById('sdb_date').value || todayISO();
+  const note = document.getElementById('sdb_note').value.trim();
+  let amt = 0, cash = 0, bank = 0;
+  if(mode==='direct'){
+    amt = parseFloat(document.getElementById('sdb_amount').value)||0;
+  } else {
+    cash = parseFloat(document.getElementById('sdb_cash').value)||0;
+    bank = parseFloat(document.getElementById('sdb_bank').value)||0;
+    amt = cash + bank;
+  }
+  if(!amt || amt<=0){ alert('Enter valid amount'); return; }
+  const balanceBefore = computeBalanceRemaining();
+  const applyAmt = Math.min(amt, settleDebitTarget.outstanding);
+  settleDebitTarget.outstanding -= applyAmt;
+  if(settleDebitTarget.outstanding<=0.5){ settleDebitTarget.outstanding=0; settleDebitTarget.settled=true; }
+  settleDebitTarget.repayments.push({id:uid(), date, amount:applyAmt, cash, bank, mode, note});
+  if(mode==='balance'){
+    state.cashHand -= cash;
+    state.cashBank -= bank;
+  }
+  logActivity('✅','Debit Settled', `${settleDebitTarget.lenderName} — ${fmt(applyAmt)} (${mode==='direct'?'Direct':'Hamare Balance Se'})`, applyAmt, date, mode==='direct'?'--sub':'--gold', mode==='balance'?balanceBefore:undefined);
+  closeAll(); save();
+}
+
+function toggleExpenseSettled(id){
+  const e = state.expenses.find(x=>x.id===id);
+  if(!e) return;
+  const balanceBefore = computeBalanceRemaining();
+  e.settled = !e.settled;
+  logActivity(e.settled?'✅':'↩️', e.settled?'Expense Settled':'Expense Reopened', e.description, e.amount, todayISO(), e.settled?'--green':'--purple', balanceBefore);
+  save();
+}
+
+let settleTxnTarget = null;
+function openSettleTxn(id){
+  settleTxnTarget = state.transactions.find(t=>t.id===id);
+  if(!settleTxnTarget) return;
+  if(!settleTxnTarget.settlements) settleTxnTarget.settlements=[];
+  const settledSoFar = settleTxnTarget.settlements.reduce((s,x)=>s+x.amount,0);
+  const due = settleTxnTarget.overall - settledSoFar;
+  document.getElementById('stx_info').textContent =
+    `${settleTxnTarget.name||'Sopari Purchase'} — Overall ${fmt(settleTxnTarget.overall)} | Settled so far ${fmt(settledSoFar)} | Balance Due ${fmt(Math.max(due,0))}`;
+  document.getElementById('stx_date').value = todayISO();
+  document.getElementById('stx_cash').value='';
+  document.getElementById('stx_bank').value='';
+  document.getElementById('stx_note').value='';
+  updateStxCalc();
+  openSheet('ov-settletxn','sh-settletxn');
+}
+function updateStxCalc(){
+  const cash = parseFloat(document.getElementById('stx_cash').value)||0;
+  const bank = parseFloat(document.getElementById('stx_bank').value)||0;
+  document.getElementById('stx_calc').textContent = `Total Settling Now: ${fmt(cash+bank)}`;
+}
+function saveSettleTxn(){
+  const cash = parseFloat(document.getElementById('stx_cash').value)||0;
+  const bank = parseFloat(document.getElementById('stx_bank').value)||0;
+  const amt = cash + bank;
+  const date = document.getElementById('stx_date').value || todayISO();
+  const note = document.getElementById('stx_note').value.trim();
+  if(!amt || amt<=0){ alert('Enter valid cash/bank amount'); return; }
+  if(!settleTxnTarget) return;
+  const balanceBefore = computeBalanceRemaining();
+  if(!settleTxnTarget.settlements) settleTxnTarget.settlements=[];
+  settleTxnTarget.settlements.push({id:uid(), date, amount:amt, cash, bank, note});
+  state.cashHand += cash;
+  state.cashBank += bank;
+  const settledSoFar = settleTxnTarget.settlements.reduce((s,x)=>s+x.amount,0);
+  const due = settleTxnTarget.overall - settledSoFar;
+  settleTxnTarget.settled = due<=0.5;
+  logActivity('✅','Sopari Settlement', `${settleTxnTarget.name||'Sopari Purchase'} — ${fmt(amt)} (Cash ${fmt(cash)}/Bank ${fmt(bank)})${due<=0.5?' (Clear)':` (Balance ${fmt(Math.max(due,0))})`}`, amt, date, due<=0.5?'--green':'--gold', balanceBefore);
+  closeAll(); save();
+}
+
+let expandedTxnId = null;
+function toggleTxnExpand(id){
+  expandedTxnId = (expandedTxnId===id) ? null : id;
+  render();
+}
+
+function openSettle(creditId){
+  settleTarget = state.credits.find(c=>c.id===creditId);
+  if(!settleTarget) return;
+  document.getElementById('settle_info').textContent =
+    `${settleTarget.name} — Outstanding: ${fmt(settleTarget.outstanding)}`;
+  document.getElementById('settle_date').value = todayISO();
+  document.getElementById('settle_amount').value='';
+  openSheet('ov-settle','sh-settle');
+}
+function saveSettle(){
+  const amt = parseFloat(document.getElementById('settle_amount').value);
+  const src = document.getElementById('settle_src').dataset.val;
+  const date = document.getElementById('settle_date').value || todayISO();
+  if(!amt || amt<=0){ alert('Enter valid amount'); return; }
+  if(!settleTarget) return;
+  const balanceBefore = computeBalanceRemaining();
+  const applyAmt = Math.min(amt, settleTarget.outstanding);
+  settleTarget.outstanding -= applyAmt;
+  if(settleTarget.outstanding<=0.5){ settleTarget.outstanding=0; settleTarget.settled=true; }
+  if(src==='hand') state.cashHand += applyAmt; else state.cashBank += applyAmt;
+  logActivity('✅','Credit Settled', `${settleTarget.name} — ${fmt(applyAmt)} into ${src==='hand'?'Cash Hand':'Cash Bank'}`, applyAmt, date, '--green', balanceBefore);
+  closeAll(); save();
+}
+
+function toggleBreakdown(which){
+  const idMap = {cash:'cashBreakdown', expense:'expenseBreakdown', debit:'debitBreakdown', check:'checkBreakdown'};
+  const id = idMap[which];
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  if(which==='expense' && el.classList.contains('open')) renderExpenseList();
+  if(which==='debit' && el.classList.contains('open')) renderDebitList();
+  if(which==='check' && el.classList.contains('open')) renderCheckList();
+}
+
+let partnerPool = 'hand';
+function openAddPartner(pool){
+  partnerPool = pool;
+  document.getElementById('partner_title').textContent = `Partner Holding — ${pool==='hand'?'Cash in Hand':'Cash in Bank'}`;
+  const total = pool==='hand' ? state.cashHand : state.cashBank;
+  const assigned = (state.partnerCash[pool]||[]).reduce((s,p)=>s+p.amount,0);
+  document.getElementById('partner_hint').textContent = `Total ${fmt(total)} | Already assigned: ${fmt(assigned)} | Unassigned: ${fmt(total-assigned)}`;
+  document.getElementById('pt_name').value='';
+  document.getElementById('pt_amount').value='';
+  openSheet('ov-partner','sh-partner');
+}
+function savePartnerHolding(){
+  const name = document.getElementById('pt_name').value.trim();
+  const amt = parseFloat(document.getElementById('pt_amount').value)||0;
+  if(!name){ alert('Enter partner name'); return; }
+  const total = partnerPool==='hand' ? state.cashHand : state.cashBank;
+  const existing = (state.partnerCash[partnerPool]||[]).reduce((s,p)=>s+p.amount,0);
+  const newTotal = existing + amt;
+  if(Math.abs(newTotal - total) > 0.5){
+    const diff = total - newTotal;
+    const msg = diff > 0
+      ? `Tally nahi ho raha — ${fmt(diff)} abhi bhi unassigned rahega (${pool_label()}). Phir bhi add karun?`
+      : `Tally nahi ho raha — assigned amount total se ${fmt(Math.abs(diff))} zyada ho jaayega (${pool_label()}). Phir bhi add karun?`;
+    if(!confirm(msg)) return;
+  }
+  if(!state.partnerCash[partnerPool]) state.partnerCash[partnerPool]=[];
+  state.partnerCash[partnerPool].push({id:uid(), name, amount:amt});
+  closeAll(); save();
+}
+function pool_label(){ return partnerPool==='hand' ? 'Cash in Hand' : 'Cash in Bank'; }
+function deletePartnerHolding(pool, id){
+  state.partnerCash[pool] = (state.partnerCash[pool]||[]).filter(p=>p.id!==id);
+  save();
+}
+function renderPartnerLists(){
+  ['hand','bank'].forEach(pool=>{
+    const el = document.getElementById(pool==='hand'?'partnerHandList':'partnerBankList');
+    const list = state.partnerCash[pool]||[];
+    el.innerHTML = list.length ? list.map(p=>
+      `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:4px 0; border-top:1px solid var(--border);">
+        <span>${p.name}</span>
+        <span style="display:flex; align-items:center; gap:6px;"><b>${fmt(p.amount)}</b>${isAdmin?`<button onclick="deletePartnerHolding('${pool}','${p.id}')" style="background:none; border:none; color:var(--red); font-size:14px; padding:0 2px;">✕</button>`:''}</span>
+      </div>`
+    ).join('') : '';
+  });
+}
+
+// ---------- RENDER ----------
+function renderExpenseList(){
+  const list = state.expenses.filter(e=>!e.settled);
+  document.getElementById('expenseList').innerHTML = list.length ? list.map(r=>{
+    const toggleBtn = isAdmin ? `<button class="btn primary" style="padding:6px 12px; font-size:12px; margin-top:4px;" onclick="toggleExpenseSettled('${r.id}')">Mark Settled</button>` : '';
+    return `<div class="row"><div><div class="rl">${r.description}</div><div class="rs">${fmt(r.amount)}${r.note?' • '+r.note:''} • ${displayDate(r.date)}</div></div>
+      <div style="text-align:right;">${toggleBtn}</div></div>`;
+  }).join('') : `<div class="empty">Koi pending expense nahi hai.</div>`;
+}
+
+function renderDebitList(){
+  const list = state.debits;
+  const usedForLabel = {sopari:'Sopari', credit:'Credit', expense:'Expense', other:'Other'};
+  document.getElementById('debitList').innerHTML = list.length ? list.map(r=>{
+    const badge = r.settled ? `<span class="pill settled">Clear</span>` : `<span class="pill given">${fmt(r.outstanding)} due</span>`;
+    const settleBtn = (r.settled || !isAdmin) ? '' : `<button class="btn primary" style="padding:6px 12px; font-size:12px; margin-left:8px;" onclick="openSettleDebit('${r.id}')">Settle</button>`;
+    return `<div class="row"><div><div class="rl">${r.lenderName}</div><div class="rs">Used for ${usedForLabel[r.usedFor]||r.usedFor}${r.note?' • '+r.note:''} • ${displayDate(r.date)}</div></div>
+      <div style="text-align:right; display:flex; align-items:center;">${badge}${settleBtn}</div></div>`;
+  }).join('') : `<div class="empty">Koi debit entry nahi hai.</div>`;
+}
+
+function renderCheckList(){
+  const list = state.balanceChecks;
+  const newBtn = isAdmin ? `<button class="btn primary" style="width:100%; margin-bottom:10px;" onclick="event.stopPropagation(); openBalanceCheck()">+ New Check</button>` : '';
+  const rows = list.length ? list.map(r=>{
+    const isMatch = Math.abs(r.diff)<=0.5;
+    const sign = r.diff<0 ? '−' : '+';
+    const amtText = isMatch ? '₹0' : `${sign}${fmt(Math.abs(r.diff))}`;
+    const color = isMatch ? 'var(--sub)' : (r.diff<0 ? 'var(--red)' : 'var(--green)');
+    return `<div class="row"><div><div class="rl">${fmt(r.actualTotal)}</div><div class="rs">${displayDate(r.date)}</div></div>
+      <div class="amt" style="color:${color}">${amtText}</div></div>`;
+  }).join('') : `<div class="empty">Abhi tak koi check nahi kiya.</div>`;
+  document.getElementById('checkDetail').innerHTML = newBtn + rows;
+}
+
+function computeBalanceRemaining(){
+  const given = state.credits.filter(c=>c.type==='given'&&!c.settled).reduce((s,c)=>s+c.outstanding,0);
+  const totalInvestment = state.totalInvestment || 0;
+  const expensesTotal = state.expenses.filter(e=>!e.settled).reduce((s,e)=>s+(e.amount||0),0);
+  const txnTotal = state.transactions.reduce((s,t)=>{
+    const settledSoFar = (t.settlements||[]).reduce((a,x)=>a+x.amount,0);
+    return s + Math.max((t.overall||0) - settledSoFar, 0);
+  },0);
+  const debitRepaidFromBalance = state.debits.reduce((s,d)=>
+    s + (d.repayments||[]).filter(r=>r.mode==='balance').reduce((a,r)=>a+r.amount,0), 0);
+  const pnlAdjustment = state.balanceChecks.reduce((s,c)=>s+(c.diff||0),0);
+  const usedTotal = given + expensesTotal + txnTotal + debitRepaidFromBalance;
+  return totalInvestment - usedTotal + pnlAdjustment;
+}
+
+function render(){
+  const creditsOutstanding = state.credits.filter(c=>!c.settled).reduce((s,c)=>s+c.outstanding,0);
+  const given = state.credits.filter(c=>c.type==='given'&&!c.settled).reduce((s,c)=>s+c.outstanding,0);
+  const totalGivenEver = state.credits.filter(c=>c.type==='given').reduce((s,c)=>s+c.amount,0);
+  const totalInvestment = state.totalInvestment || 0;
+
+  const expensesTotal = state.expenses.filter(e=>!e.settled).reduce((s,e)=>s+(e.amount||0),0);
+  const txnTotal = state.transactions.reduce((s,t)=>{
+    const settledSoFar = (t.settlements||[]).reduce((a,x)=>a+x.amount,0);
+    return s + Math.max((t.overall||0) - settledSoFar, 0);
+  },0);
+  const debitOutstanding = state.debits.filter(d=>!d.settled).reduce((s,d)=>s+d.outstanding,0);
+  const debitRepaidFromBalance = state.debits.reduce((s,d)=>
+    s + (d.repayments||[]).filter(r=>r.mode==='balance').reduce((a,r)=>a+r.amount,0), 0);
+  const pnlAdjustment = state.balanceChecks.reduce((s,c)=>s+(c.diff||0),0);
+  const usedTotal = given + expensesTotal + txnTotal + debitRepaidFromBalance;
+  const balanceRemaining = totalInvestment - usedTotal + pnlAdjustment;
+
+  document.getElementById('totalInvestment').textContent = fmt(totalInvestment);
+  document.getElementById('balanceRemaining').textContent = fmt(balanceRemaining);
+  document.getElementById('balanceLine').textContent =
+    `${fmt(totalInvestment)} − Credits ${fmt(given)} − Expenses ${fmt(expensesTotal)} − Transactions ${fmt(txnTotal)} − Debit Repaid ${fmt(debitRepaidFromBalance)} ${pnlAdjustment<0?'−':'+'} P&L ${fmt(Math.abs(pnlAdjustment))}`;
+  document.getElementById('debitBalance').textContent = fmt(debitOutstanding);
+
+  const isPnlZero = Math.abs(pnlAdjustment)<=0.5;
+  document.getElementById('u_pnl').textContent = isPnlZero ? '₹0' : `${pnlAdjustment<0?'−':'+'}${fmt(Math.abs(pnlAdjustment))}`;
+  document.getElementById('u_pnl').style.color = isPnlZero ? 'var(--sub)' : (pnlAdjustment<0 ? 'var(--red)' : 'var(--green)');
+  if(document.getElementById('checkBreakdown').classList.contains('open')) renderCheckList();
+  document.getElementById('u_credits').textContent = fmt(given);
+  document.getElementById('u_expenses').textContent = fmt(expensesTotal);
+  document.getElementById('u_txns').textContent = fmt(txnTotal);
+
+  document.getElementById('cashHandVal').textContent = fmt(state.cashHand);
+  document.getElementById('cashBankVal').textContent = fmt(state.cashBank);
+  renderPartnerLists();
+
+  document.getElementById('c_given').textContent = fmt(given);
+  document.getElementById('c_totalGiven').textContent = fmt(totalGivenEver);
+
+  if(document.getElementById('expenseBreakdown').classList.contains('open')) renderExpenseList();
+
+  // activity feed — sorted by date desc, full history (dedicated tab now)
+  const recent = [...state.activity].sort((a,b)=> b.date.localeCompare(a.date));
+  document.getElementById('recentList').innerHTML = recent.length ? recent.map(r=>{
+    const hasBalanceChange = typeof r.balanceBefore === 'number' && typeof r.balanceAfter === 'number' && Math.abs(r.balanceAfter - r.balanceBefore) > 0.5;
+    const balanceLine = hasBalanceChange
+      ? `<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-size:11.5px; color:var(--sub);">
+          <span>Before: <b style="color:var(--text)">${fmt(r.balanceBefore)}</b></span>
+          <span>After: <b style="color:var(--accent)">${fmt(r.balanceAfter)}</b></span>
+        </div>`
+      : '';
+    return `<div class="row" style="flex-direction:column; align-items:stretch;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div><div class="rl">${r.icon} ${r.title}</div><div class="rs">${r.subtitle||''} • ${displayDate(r.date)} • by ${r.by||'Unknown'}</div></div>
+        <div class="amt" style="color:var(${r.color||'--text'})">${fmt(r.amount)}</div>
+      </div>
+      ${balanceLine}
+    </div>`;
+  }).join('') : `<div class="empty">No activity yet. Tap + to add.</div>`;
+
+  // investment list
+  document.getElementById('investmentList').innerHTML = state.investments.length ? state.investments.map(r=>{
+    const editBtn = isAdmin ? `<button onclick="openEditInvestmentEntry('${r.id}')" style="background:rgba(255,255,255,.08); border:none; color:var(--text); font-size:11px; padding:4px 9px; border-radius:7px; margin-left:6px;">✏️ Edit</button>` : '';
+    return `<div class="row"><div><div class="rl">+ ${fmt(r.amount)}</div><div class="rs">${r.note||'Top-up'} • ${displayDate(r.date)}</div></div>
+      <div style="display:flex; align-items:center;"><span class="pill ${r.type}">${r.type==='hand'?'Hand':'Bank'}</span>${editBtn}</div></div>`;
+  }).join('') : `<div class="empty">No investment entries yet.</div>`;
+
+  // transactions list
+  document.getElementById('transactionList').innerHTML = state.transactions.length ? state.transactions.map(r=>{
+    const settlements = r.settlements||[];
+    const settledSoFar = settlements.reduce((s,x)=>s+x.amount,0);
+    const due = r.overall - settledSoFar;
+    const isClear = due<=0.5;
+    const badge = isClear ? `<span class="pill settled">Clear</span>` : (settledSoFar>0 ? `<span class="pill recv">Balance ${fmt(due)}</span>` : `<span class="pill recv">In Process</span>`);
+    const sub = `Cash ${fmt(r.cash)} + Bank ${fmt(r.bank)} = Total ${fmt(r.total)}${r.expenses?` + Exp ${fmt(r.expenses)}`:''} = Overall ${fmt(r.overall)}`;
+    const isOpen = expandedTxnId===r.id;
+    const historyHtml = settlements.length ? settlements.map(s=>
+      `<div class="row" style="background:rgba(255,255,255,.03); margin-bottom:6px;"><div><div class="rl">${fmt(s.amount)}</div><div class="rs">Cash ${fmt(s.cash||0)} / Bank ${fmt(s.bank||0)}${s.note?' • '+s.note:''} • ${displayDate(s.date)}</div></div></div>`
+    ).join('') : `<div class="empty" style="padding:14px;">Abhi tak koi settlement nahi hua.</div>`;
+    const settleBtn = !isAdmin ? '' : (isClear
+      ? `<button class="btn ghost" style="padding:8px 12px; font-size:12px;" onclick="event.stopPropagation(); openSettleTxn('${r.id}')">Adjust Settlement</button>`
+      : `<button class="btn primary" style="padding:8px 12px; font-size:12px;" onclick="event.stopPropagation(); openSettleTxn('${r.id}')">Settle Payment</button>`);
+    return `<div class="row" style="flex-direction:column; align-items:stretch; cursor:pointer;" onclick="toggleTxnExpand('${r.id}')">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div><div class="rl">📦 ${r.name||'Sopari Purchase'}</div><div class="rs">${sub}${r.note?' • '+r.note:''} • ${displayDate(r.date)}</div></div>
+        <div style="text-align:right;">${badge}</div>
+      </div>
+      ${isOpen ? `<div style="margin-top:12px; border-top:1px solid var(--border); padding-top:10px;">
+        <div class="section-title" style="margin:0 0 6px;">Settlement History</div>
+        ${historyHtml}
+        <div style="margin-top:8px;">${settleBtn}</div>
+      </div>` : ''}
+    </div>`;
+  }).join('') : `<div class="empty">No purchases yet. Tap + to add a sopari purchase.</div>`;
+
+  // credits by person
+  const byPerson = {};
+  state.credits.filter(c=>!c.settled).forEach(c=>{
+    byPerson[c.name] = byPerson[c.name] || 0;
+    byPerson[c.name] += c.outstanding;
+  });
+  const names = Object.keys(byPerson);
+  document.getElementById('creditsByPerson').innerHTML = names.length ? names.map(n=>
+    `<div class="group"><div class="gh"><span>${n}</span><span style="color:var(--gold)">${fmt(byPerson[n])}</span></div></div>`
+  ).join('') : `<div class="empty">No outstanding credits.</div>`;
+
+  // all credit entries
+  document.getElementById('creditsList').innerHTML = state.credits.length ? state.credits.map(r=>{
+    const badge = r.settled ? `<span class="pill settled">Settled</span>` : `<span class="pill given">${fmt(r.outstanding)} due</span>`;
+    const settleBtn = (r.settled || !isAdmin) ? '' : `<button class="btn primary" style="padding:6px 12px; font-size:12px; margin-left:8px;" onclick="openSettle('${r.id}')">Settle</button>`;
+    return `<div class="row"><div><div class="rl">${r.name}</div><div class="rs">From ${r.source==='hand'?'Cash Hand':'Cash Bank'}${r.note?' • '+r.note:''} • ${displayDate(r.date)}</div></div>
+      <div style="text-align:right; display:flex; align-items:center;">${badge}${settleBtn}</div></div>`;
+  }).join('') : `<div class="empty">No credit entries yet.</div>`;
+}
+
+window.showTab = showTab;
+window.openFab = openFab;
+window.openAddInvestment = openAddInvestment;
+window.openEditInvestment = openEditInvestment;
+window.saveEditInvestment = saveEditInvestment;
+window.openGiveCredit = openGiveCredit;
+window.openAddTransaction = openAddTransaction;
+window.openAddExpense = openAddExpense;
+window.saveInvestment = saveInvestment;
+window.saveCredit = saveCredit;
+window.saveTransaction = saveTransaction;
+window.saveExpense = saveExpense;
+window.saveSettle = saveSettle;
+window.closeAll = closeAll;
+window.setSeg = setSeg;
+window.updateTxnCalc = updateTxnCalc;
+window.toggleTxnExpand = toggleTxnExpand;
+window.openSettleTxn = openSettleTxn;
+window.saveSettleTxn = saveSettleTxn;
+window.updateStxCalc = updateStxCalc;
+window.toggleExpenseSettled = toggleExpenseSettled;
+window.openSettle = openSettle;
+window.toggleBreakdown = toggleBreakdown;
+window.openAddPartner = openAddPartner;
+window.savePartnerHolding = savePartnerHolding;
+window.deletePartnerHolding = deletePartnerHolding;
+window.openAddDebit = openAddDebit;
+window.openTransfer = openTransfer;
+window.saveTransfer = saveTransfer;
+window.openBalanceCheck = openBalanceCheck;
+window.saveBalanceCheck = saveBalanceCheck;
+window.saveDebit = saveDebit;
+window.openSettleDebit = openSettleDebit;
+window.saveSettleDebit = saveSettleDebit;
+window.updateSdbMode = updateSdbMode;
+window.updateSdbCalc = updateSdbCalc;
+
+render();
+firebaseSignInThenSync();
+</script>
+</body>
+</html>
